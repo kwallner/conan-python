@@ -1,7 +1,7 @@
 import os
 import subprocess
 import shutil
-from conans import ConanFile, MSBuild, tools, errors, AutoToolsBuildEnvironment
+from conans import ConanFile, VisualStudioBuildEnvironment, tools, errors, AutoToolsBuildEnvironment
     
 class ConanProject(ConanFile):
     name        = "python"
@@ -16,6 +16,11 @@ class ConanProject(ConanFile):
     @property
     def python_interpreter(self):
         return "bin\\python.exe" if self.settings.os == "Windows" else "./bin/python3"
+
+    def configure(self):
+        if self.settings.os == "Windows":
+            if self.settings.arch != "x86_64":
+                raise errors.ConanInvalidConfiguration("Platform is not supported.")
 
     def system_requirements(self):
         if self.settings.os == "Linux":
@@ -52,14 +57,19 @@ class ConanProject(ConanFile):
             os.remove(self._pip_whl)
         
     def build(self):
-        with tools.chdir("Python-%s" % self.version):
-            if self.settings.os == "Windows":
-                with tools.chdir("PCBuild"):
-                    with tools.vcvars(self.settings) if self.settings.compiler == "Visual Studio" else tools.no_op():
-                        msbuild = MSBuild(self)
-                        #msbuild.build("pcbuild.sln", build_type="Debug")
-                        msbuild.build("pcbuild.sln", build_type="Release")
-            else:
+        if self.settings.os == "Windows":
+            env_build = VisualStudioBuildEnvironment(self)
+            with tools.environment_append(env_build.vars):
+                with tools.chdir(os.path.join("Python-%s" % self.version, "PCBuild")):
+                    vcvars = tools.vcvars_command(self.settings)
+                    self.run("%s && cmd /C build.bat -p x64 -d" % vcvars)
+                    self.run("%s && cmd /C build.bat -p x64" % vcvars)
+                #subprocess.run(["cmd", "/C", "build.bat", "-p", "x64", "-d"], check=True, cwd=os.path.join(self.build_folder, "Python-%s" % self.version, "PCBuild"))
+                #    #msbuild = MSBuild(self)
+                #    #msbuild.build("pcbuild.sln", build_type="Debug", arch ="x86_64")
+                #    #msbuild.build("pcbuild.sln", build_type="Release")
+        else:
+            with tools.chdir("Python-%s" % self.version):
                 os.chmod("configure", 
                     stat.S_IRUSR |
                     stat.S_IWUSR |
@@ -71,7 +81,7 @@ class ConanProject(ConanFile):
                     stat.S_IXOTH 
                     )
                 atools = AutoToolsBuildEnvironment(self)
-                args = ["--enable-shared"] if self.options.shared else []
+                args = [] # ["--enable-shared"] if self.options.shared else []
                 atools.configure(args=args)
                 atools.make()
                 atools.install()
