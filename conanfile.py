@@ -59,7 +59,6 @@ class ConanProject(ConanFile):
                 "--prefix=.", 
                 "--no-warn-script-location", 
                 whl_file], cwd=self.package_folder, shell=True, check=True, env=env_python)
-            shutil.rmtree("Scripts")
             os.remove(os.path.join(self.package_folder, self._pip_whl))
         
     def _install_whl(self, whl_file):
@@ -77,7 +76,6 @@ class ConanProject(ConanFile):
                 "--prefix=.", 
                 "--no-warn-script-location", 
                 whl_file], cwd=self.package_folder, shell=True, check=True, env=env_python)
-            shutil.rmtree("Scripts")
             
     def build(self):
         if self.settings.os == "Windows":
