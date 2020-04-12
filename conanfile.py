@@ -1,4 +1,5 @@
 import os
+import glob
 import subprocess
 import shutil
 from conans import ConanFile, VisualStudioBuildEnvironment, tools, errors, AutoToolsBuildEnvironment
@@ -21,11 +22,9 @@ class ConanProject(ConanFile):
 
     def configure(self):
         if self.settings.os == "Windows":
-            if self.settings.arch != "x86_64":
-                raise errors.ConanInvalidConfiguration("Platform is not supported.")
-            if self.settings.compiler != "Visual Studio" and self.settings.compiler.version != "15":
+            if self.settings.compiler != "Visual Studio" or self.settings.compiler.version != "15":
                 raise errors.ConanInvalidConfiguration("Compiler is not supported.")
-
+            
     def system_requirements(self):
         if self.settings.os == "Linux":
             pack_name = self.name
@@ -41,6 +40,9 @@ class ConanProject(ConanFile):
         if tools.os_info.is_windows:  
             with tools.chdir(os.path.join("Python-%s" % self.version, "PCBuild")):
                 self.run("get_externals.bat")
+                #env_python = os.environ.copy()
+                #env_python["python_zip"] = "https://www.nuget.org/api/v2/package/pythonx86/%s" % self.version
+                #subprocess.run(["get_externals.bat", "--python", self.version], shell=True, check=True, env=env_python)
         os.remove("Python-%s.tgz" % self.version)
 
     def _install_pip(self, whl_file):
@@ -115,9 +117,15 @@ class ConanProject(ConanFile):
             shutil.copytree(os.path.join(self.build_folder, "Python-%s" % self.version, "Include"), os.path.join(self.package_folder, "include"))
             self.copy(pattern="*.h", dst="include", src=pc_folder, keep_path=False)
             shutil.copytree(os.path.join(self.build_folder, "Python-%s" % self.version, "Lib"), os.path.join(self.package_folder, "Lib"))
+            self.copy(pattern="LICENSE", dst=".", src=pcbuild_folder, keep_path=False)
         self._install_pip("pip")
         self._install_whl("wheel")
         self._install_whl("setuptools")
+        # Remove python compiled files
+        for filename in glob.glob(os.path.join(self.package_folder, "**", "*.pyc"), recursive=True):
+            os.remove(filename)
+        for filename in glob.glob(os.path.join(self.package_folder, "**", "__pycache__"), recursive=True):
+            os.rmdir(filename)
 
     def package_id(self):
         del self.info.settings.compiler
