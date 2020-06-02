@@ -13,21 +13,26 @@ class ConanProject(ConanFile):
     settings = "os", "arch"
     generators  = "txt"
     no_copy_source = True
-    _pip_whl = "pip-20.0.2-py2.py3-none-any.whl"
+    options = { "with_tkinter" : [False,True] }
+    default_options = { "with_tkinter" : False }
+    _pip_whl = "pip-20.1.1-py2.py3-none-any.whl"
     _wheel_whl = "wheel-0.34.2-py2.py3-none-any.whl"
-    _setuptools_whl = "setuptools-46.0.0-py3-none-any.whl"
+    _setuptools_whl = "setuptools-47.1.1-py3-none-any.whl"
 
     @property
     def python_interpreter(self):
         return "bin\\python.exe" if self.settings.os == "Windows" else "./bin/python3"
-            
+
+    def configure(self):
+        self.options["cpython"].with_tkinter = self.options.with_tkinter
+
     def build_requirements(self):
         self.build_requires("cpython/%s@%s/%s" % (self.version, self.user, self.channel))
 
     def source(self):
-        tools.download("https://files.pythonhosted.org/packages/54/0c/d01aa759fdc501a58f431eb594a17495f15b88da142ce14b5845662c13f3/%s" % self._pip_whl, self._pip_whl, sha256="4ae14a42d8adba3205ebeb38aa68cfc0b6c346e1ae2e699a0b3bad4da19cef5c")
+        tools.download("https://files.pythonhosted.org/packages/43/84/23ed6a1796480a6f1a2d38f2802901d078266bda38388954d01d3f2e821d/%s" % self._pip_whl, self._pip_whl, sha256="b27c4dedae8c41aa59108f2fa38bf78e0890e590545bc8ece7cdceb4ba60f6e4")
         tools.download("https://files.pythonhosted.org/packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14/%s" % self._wheel_whl, self._wheel_whl, sha256="df277cb51e61359aba502208d680f90c0493adec6f0e848af94948778aed386e")
-        tools.download("https://files.pythonhosted.org/packages/70/b8/b23170ddda9f07c3444d49accde49f2b92f97bb2f2ebc312618ef12e4bd6/%s" % self._setuptools_whl, self._setuptools_whl, sha256="693e0504490ed8420522bf6bc3aa4b0da6a9f1c80c68acfb4e959275fd04cd82")
+        tools.download("https://files.pythonhosted.org/packages/95/95/f657b6e17f00c3f35b5f68b10e46c3a43af353d8856bd57bfcfb1dbb3e92/%s" % self._setuptools_whl, self._setuptools_whl, sha256="74f33f44290f95c5c4a7c13ccc9d6d1a16837fe9dce0acf411dd244e7de95143")
 
     def _install_pip(self, whl_file):
         with tools.chdir(self.package_folder):
