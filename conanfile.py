@@ -1,9 +1,134 @@
 import os
+import sys
 import glob
 import subprocess
+import tempfile
 import shutil
 from conans import ConanFile, VisualStudioBuildEnvironment, tools, errors, AutoToolsBuildEnvironment
     
+class PythonHelper(object):
+    _install_packages = []
+
+    def _find_python_command(self, try_names):
+        python_rootpath = os.path.join(self.deps_cpp_info["python"].rootpath, "bin")
+        exe_estension = ".exe" if self.settings.os == "Windows" else ""
+        for try_name in try_names:
+            try_filename = os.path.join(python_rootpath, try_name + exe_estension)
+            if os.path.exists(try_filename):
+                return try_filename
+        raise errors.ConanInvalidConfiguration("Python command %s not found in directory %s." % (" or ".join(try_names), python_rootpath))
+
+    @property 
+    def _python_command(self):
+        return self._find_python_command(["python3", "python"])
+    
+    @property
+    def _python_version(self):
+        python_version_output = None
+        try:
+            python_version_output = subprocess.check_output([self._python_command, "-V"])
+        except:
+            raise errors.ConanInvalidConfiguration("Failed to detect python version.")
+        (_,python_version_output_decoded) = python_version_output.decode("utf8").strip().split(" ", 2) 
+        return ("".join(python_version_output_decoded.split(".")[0:2]))
+
+    @property
+    def _python_platform(self):
+        if self.settings.os == 'Windows':
+            if self.settings.arch == 'x86_64':
+                return "win_amd64"
+            elif self.settings.arch == 'x86':   
+                return  "win_x86"
+        elif self.settings.os == 'Linux':
+            if self.settings.arch == 'x86_64':
+                return "linux_x86_64"
+            elif self.settings.arch == 'x86':   
+                return "linux_x86"
+            elif self.settings.arch == 'aarch64':   
+                return "linux_aarch64"
+        raise errors.ConanInvalidConfiguration("Failed to detect python platform.")
+
+    @property
+    def _python_implementation(self):
+        return "cp"
+
+    @property
+    def _python_platform_version_implementation(self):
+        platform_spec = []
+        if not self._python_platform == "linux_x86_64":
+            platform_spec.extend(["--platform", self._python_platform])
+        platform_spec.extend(["--python-version", self._python_version])
+        platform_spec.extend(["--implementation", self._python_implementation])
+        return platform_spec
+
+    def _append_install_package(self, package_spec):
+        if not package_spec in self._install_packages:
+            self._install_packages.append(package_spec)
+   
+    def _pypi_pip_to_archive(self, pkg_name):
+        import subprocess
+        command = [
+            self._python_command, "-m", "pip",
+            "download",
+            "--only-binary=:all:",
+            "--no-binary=:none:" ]
+        command.extend(self._python_platform_version_implementation)
+        command.extend([ 
+            "--find-links=.", 
+            "--isolated", 
+            pkg_name ])
+        subprocess.run(command, cwd=self.source_folder, check=True)
+        
+    def pip_add_whl(self, pkg_name):
+        self._pypi_pip_to_archive(pkg_name)
+        self._append_install_package(pkg_name)
+    
+    def pip_add_tar(self, pkg_name, setup_args=[]):
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            with tools.chdir(tmpdirname): 
+                command = [
+                    self._python_command, "-m", "pip",
+                    "download",
+                    "--no-deps"]
+                command.extend(self._python_platform_version_implementation)
+                command.extend(["--find-links=.", 
+                    "--isolated", 
+                    pkg_name])
+                self.output.info("-- running command (cwd=%s): %s" % (".", " ".join(command))) 
+                subprocess.run(command, check=True)
+                for filename in os.listdir("."):
+                    if filename.endswith(".tar.gz"):
+                        tools.untargz(filename)
+                        with tools.chdir(filename.replace(".tar.gz", "")): 
+                            tools.replace_in_file("setup.py", "from distutils.core import setup", "from setuptools import setup", strict=False)
+                            command = [ self._python_command, "setup.py" ]
+                            command.extend(setup_args)
+                            command.extend(["bdist_wheel", "-d", self.source_folder])
+                            self.output.info("-- running command (cwd=%s): %s" % (".", " ".join(command))) 
+                            subprocess.run(command, check=True)
+                        self._append_install_package(pkg_name)
+                    else:
+                        pass
+                       
+    def pip_run_install(self):
+        os.linesep = '\n'
+        with open("requirements.txt", "w") as f:
+           for package in self._install_packages:
+               f.write('%s\n' % package)
+        subprocess.run([
+            self._python_command, "-m", "pip",
+            "install",
+            "--no-index",
+            "--no-cache-dir", 
+            "--no-compile",
+            "--isolated",
+            "--upgrade",
+            "--upgrade-strategy", "eager",
+            "--find-links=%s" % self.source_folder, 
+            "--target", self.package_folder.replace("\\", "/"),
+            "-r", "requirements.txt"])
+        shutil.rmtree(os.path.join(self.package_folder, "bin"))
+       
 class ConanProject(ConanFile):
     name        = "python"
     version     = "3.7.7"
