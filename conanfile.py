@@ -22,6 +22,14 @@ class PythonHelper(object):
     def _python_command(self):
         return self._find_python_command(["python3", "python"])
     
+    def python_run(self, args, *, append_pythonpath=[], **kwargs):
+        pythonpath_list = append_pythonpath if type(append_pythonpath) == list else [ str(append_pythonpath) ] 
+        sphinx_environ = os.environ
+        sphinx_environ["PYTHONPATH"] = os.pathsep.join([ str(p) for p in pythonpath_list ]) + os.pathsep + os.environ["PYTHONPATH"]
+        command = [self._python_command]
+        command.extend(args)
+        return subprocess.run(command, **kwargs, env=sphinx_environ)
+   
     @property
     def _python_version(self):
         python_version_output = None
@@ -67,17 +75,18 @@ class PythonHelper(object):
    
     def _pypi_pip_to_archive(self, pkg_name):
         import subprocess
-        command = [
-            self._python_command, "-m", "pip",
+        args = [
+            "-m", "pip",
+            "--disable-pip-version-check",
             "download",
             "--only-binary=:all:",
             "--no-binary=:none:" ]
-        command.extend(self._python_platform_version_implementation)
-        command.extend([ 
+        args.extend(self._python_platform_version_implementation)
+        args.extend([ 
             "--find-links=.", 
             "--isolated", 
             pkg_name ])
-        subprocess.run(command, cwd=self.source_folder, check=True)
+        self.python_run(args, cwd=self.source_folder, check=True)
         
     def pip_add_whl(self, pkg_name):
         self._pypi_pip_to_archive(pkg_name)
@@ -86,26 +95,27 @@ class PythonHelper(object):
     def pip_add_tar(self, pkg_name, setup_args=[]):
         with tempfile.TemporaryDirectory() as tmpdirname:
             with tools.chdir(tmpdirname): 
-                command = [
-                    self._python_command, "-m", "pip",
+                args = [
+                    "-m", "pip",
+                    "--disable-pip-version-check",
                     "download",
                     "--no-deps"]
-                command.extend(self._python_platform_version_implementation)
-                command.extend(["--find-links=.", 
+                args.extend(self._python_platform_version_implementation)
+                args.extend(["--find-links=.", 
                     "--isolated", 
                     pkg_name])
-                self.output.info("-- running command (cwd=%s): %s" % (".", " ".join(command))) 
-                subprocess.run(command, check=True)
+                self.output.info("-- running python (cwd=%s) with args: %s" % (".", " ".join(args))) 
+                self.python_run(args, check=True)
                 for filename in os.listdir("."):
                     if filename.endswith(".tar.gz"):
                         tools.untargz(filename)
                         with tools.chdir(filename.replace(".tar.gz", "")): 
                             tools.replace_in_file("setup.py", "from distutils.core import setup", "from setuptools import setup", strict=False)
-                            command = [ self._python_command, "setup.py" ]
-                            command.extend(setup_args)
-                            command.extend(["bdist_wheel", "-d", self.source_folder])
-                            self.output.info("-- running command (cwd=%s): %s" % (".", " ".join(command))) 
-                            subprocess.run(command, check=True)
+                            args = [ "setup.py" ]
+                            args.extend(setup_args)
+                            args.extend(["bdist_wheel", "-d", self.source_folder])
+                            self.output.info("-- running python (cwd=%s) with args: %s" % (".", " ".join(args))) 
+                            self.python_run(args, check=True)
                         self._append_install_package(pkg_name)
                     else:
                         pass
@@ -113,10 +123,10 @@ class PythonHelper(object):
     def pip_run_install(self):
         os.linesep = '\n'
         with open("requirements.txt", "w") as f:
-           for package in self._install_packages:
+            for package in self._install_packages:
                f.write('%s\n' % package)
-        subprocess.run([
-            self._python_command, "-m", "pip",
+        args = [
+            "-m", "pip",
             "install",
             "--no-index",
             "--no-cache-dir", 
@@ -126,7 +136,8 @@ class PythonHelper(object):
             "--upgrade-strategy", "eager",
             "--find-links=%s" % self.source_folder, 
             "--target", self.package_folder.replace("\\", "/"),
-            "-r", "requirements.txt"])
+            "-r", "requirements.txt"]
+        self.python_run(args, check=True)
         shutil.rmtree(os.path.join(self.package_folder, "bin"))
        
 class ConanProject(ConanFile):
