@@ -180,7 +180,7 @@ class ConanProject(ConanFile):
                 "--find-links=%s" % self.build_folder, 
                 "--prefix=.", 
                 "--no-warn-script-location", 
-                whl_file], cwd=self.package_folder, shell=True, check=True, env=env_python)
+                whl_file], cwd=self.package_folder, shell=(self.settings.os == "Windows"), check=True, env=env_python) 
             os.remove(os.path.join(self.package_folder, self._pip_whl))
         
     def _install_whl(self, whl_file):
@@ -197,7 +197,7 @@ class ConanProject(ConanFile):
                 "--find-links=%s" % self.build_folder, 
                 "--prefix=.", 
                 "--no-warn-script-location", 
-                whl_file], cwd=self.package_folder, shell=True, check=True, env=env_python)
+                whl_file], cwd=self.package_folder, shell=(self.settings.os == "Windows"), check=True, env=env_python)
 
     def build(self):
         from distutils.dir_util import copy_tree
