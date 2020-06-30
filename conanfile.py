@@ -10,7 +10,7 @@ class PythonHelper(object):
     _install_packages = []
 
     def _find_python_command(self, try_names):
-        python_rootpath = os.path.join(self.deps_cpp_info["python"].rootpath, "bin")
+        python_rootpath = os.path.join(self.deps_cpp_info["cpython"].rootpath, "bin")
         exe_estension = ".exe" if self.settings.os == "Windows" else ""
         for try_name in try_names:
             try_filename = os.path.join(python_rootpath, try_name + exe_estension)
@@ -154,7 +154,7 @@ class ConanProject(ConanFile):
 
     @property
     def python_interpreter(self):
-        return "bin\\python.exe" if self.settings.os == "Windows" else "./bin/python3"
+        return os.path.join(self.deps_cpp_info["cpython"].rootpath, "bin", "python.exe" if self.settings.os == "Windows" else "python3")
 
             
     def build_requirements(self):
@@ -171,8 +171,8 @@ class ConanProject(ConanFile):
             self.output.info("Installing pip from package \"%s\" to folder \"%s\"." % (self._pip_whl, self.package_folder))
             env_python = os.environ.copy()
             env_python["PYTHONPATH"] = self.package_folder
-            subprocess.run([self.python_interpreter, 
-                "%s/pip" % self._pip_whl, 
+            subprocess.run([self.python_interpreter,
+                "%s/pip" % self._pip_whl,
                 "install", 
                 "--no-index", 
                 "--no-cache-dir", 
