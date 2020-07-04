@@ -9,26 +9,18 @@ from conans import ConanFile, VisualStudioBuildEnvironment, tools, errors, AutoT
 class PythonHelper(object):
     _install_packages = []
 
-    def _find_python_command(self, try_names):
-        python_rootpath = os.path.join(self.deps_cpp_info["cpython"].rootpath, "bin")
-        exe_estension = ".exe" if self.settings.os == "Windows" else ""
-        for try_name in try_names:
-            try_filename = os.path.join(python_rootpath, try_name + exe_estension)
-            if os.path.exists(try_filename):
-                return try_filename
-        raise errors.ConanInvalidConfiguration("Python command %s not found in directory %s." % (" or ".join(try_names), python_rootpath))
-
     @property 
     def _python_command(self):
-        return self._find_python_command(["python3", "python"])
+        python_bin_dir = os.path.join(self.deps_cpp_info["python"].rootpath, "bin")
+        return os.path.join(python_bin_dir, "python.exe") if os.path.join(python_bin_dir, "python.exe") else os.path.join(python_bin_dir, "python3") 
     
     def python_run(self, args, *, append_pythonpath=[], **kwargs):
         pythonpath_list = append_pythonpath if type(append_pythonpath) == list else [ str(append_pythonpath) ] 
-        sphinx_environ = os.environ
-        sphinx_environ["PYTHONPATH"] = os.pathsep.join([ str(p) for p in pythonpath_list ]) + os.pathsep + os.environ["PYTHONPATH"]
+        python_environ = os.environ
+        python_environ["PYTHONPATH"] = os.pathsep.join([ str(p) for p in pythonpath_list ]) + os.pathsep + os.environ["PYTHONPATH"]
         command = [self._python_command]
         command.extend(args)
-        return subprocess.run(command, **kwargs, env=sphinx_environ)
+        return subprocess.run(command, **kwargs, env=python_environ)
    
     @property
     def _python_version(self):
@@ -139,7 +131,49 @@ class PythonHelper(object):
             "-r", "requirements.txt"]
         self.python_run(args, check=True)
         shutil.rmtree(os.path.join(self.package_folder, "bin"))
-       
+
+    @property
+    def _python_system_spec(self):
+        return self._python_implementation + self._python_version + "-" + self._python_platform
+
+    def pip_make_installer(self, output_directory=None, zip_directory=None, zip_filename=None):
+        if output_directory is None:
+            output_directory = self.package_folder
+        if zip_filename is None:
+            zip_filename = self.name + "-" + self.version + "-" + self._python_system_spec
+        if zip_directory is None:
+            zip_directory = self.name + "-" + self.version
+        os.linesep = '\n'
+        with open("requirements.txt", "w") as f:
+            for package in self._install_packages:
+               f.write('%s\n' % package)
+        with open("install.sh", "w") as f:
+            f.write('#!/bin/sh\n')
+            f.write('set -e\n')
+            f.write('\n')
+            f.write('echo "Installing packages:"\n')
+            f.write('%s -m pip install --quiet --no-index --no-cache-dir --isolated --upgrade --upgrade-strategy eager --find-links=. -r %s\n' % (self._python_command, "requirements.txt"))
+            f.write('\n')
+        os.chmod("install.sh", 0o775)
+        if self.settings.os == "Windows":
+            os.linesep = '\r\n'
+            with open("install.bat", "w") as f:
+                f.write('@echo off\n')
+                f.write('\n')
+                f.write('echo Installing packages:\n')
+                f.write('%s -m pip install --quiet --no-index --no-cache-dir --isolated --upgrade --upgrade-strategy eager --find-links=. -r %s\n' % (self._python_command, "requirements.txt"))
+                f.write('\n')
+        os.chmod("install.bat", 0o775)
+        os.makedirs(output_directory, exist_ok=True)
+        from zipfile import ZipFile
+        with ZipFile(os.path.join(output_directory, zip_filename + '.zip'), 'w') as zip:
+            zip.write("requirements.txt", arcname=zip_directory + "/" + "requirements.txt")
+            zip.write("install.sh", arcname=zip_directory + "/" + "install.sh")
+            if self.settings.os == "Windows":
+                zip.write("install.bat", arcname=zip_directory + "/" + "install.bat")
+            for whl_file in [ f for f in os.listdir(".") if f.endswith(".whl") ]:
+                zip.write(whl_file, arcname=zip_directory + "/" + whl_file)
+                       
 class ConanProject(ConanFile):
     name        = "python"
     version     = "3.7.8"
@@ -154,9 +188,8 @@ class ConanProject(ConanFile):
 
     @property
     def python_interpreter(self):
-        return os.path.join(self.deps_cpp_info["cpython"].rootpath, "bin", "python.exe" if self.settings.os == "Windows" else "python3")
+        return os.path.join(self.package_folder, "bin", "python.exe" if self.settings.os == "Windows" else "python3")
 
-            
     def build_requirements(self):
         self.build_requires("cpython/%s@%s/%s" % (self.version, self.user, self.channel))
 
