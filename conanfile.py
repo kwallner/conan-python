@@ -11,8 +11,12 @@ class PythonHelper(object):
 
     @property 
     def _python_command(self):
-        python_bin_dir = os.path.join(self.deps_cpp_info["python"].rootpath, "bin")
-        return os.path.join(python_bin_dir, "python.exe") if os.path.join(python_bin_dir, "python.exe") else os.path.join(python_bin_dir, "python3") 
+        python_cmd = shutil.which("python3")
+        if python_cmd is None:
+            python_cmd = shutil.which("python")
+        if python_cmd is None:
+            raise errors.ConanInvalidConfiguration("Failed to find python executable.")
+        return python_cmd
     
     def python_run(self, args, *, append_pythonpath=[], **kwargs):
         pythonpath_list = append_pythonpath if type(append_pythonpath) == list else [ str(append_pythonpath) ] 
@@ -188,7 +192,10 @@ class ConanProject(ConanFile):
 
     @property
     def python_interpreter(self):
-        return os.path.join(self.package_folder, "bin", "python.exe" if self.settings.os == "Windows" else "python3")
+        if self.settings.os == "Windows":
+            return os.path.join(self.package_folder, "python.exe")
+        else:
+            return os.path.join(self.package_folder, "bin", "python3")
 
     def build_requirements(self):
         self.build_requires("cpython/%s@%s/%s" % (self.version, self.user, self.channel))
@@ -249,8 +256,14 @@ class ConanProject(ConanFile):
     def package_info(self):
         self.cpp_info.includedirs = ['include']
         self.cpp_info.libdirs = ['libs']
-        self.cpp_info.bindirs = ['bin']
-        self.env_info.PATH.insert(0, os.path.join(self.package_folder, "bin"))
+        if self.settings.os == "Windows":
+            self.cpp_info.bindirs = ['.']
+        else:
+            self.cpp_info.bindirs = ['bin']
+        if self.settings.os == "Windows":
+            self.env_info.PATH.insert(0, self.package_folder)
+        else:
+            self.env_info.PATH.insert(0, os.path.join(self.package_folder, "bin"))
         self.env_info.PYTHONPATH.insert(0, os.path.join(self.package_folder, "Lib"))
         self.env_info.PYTHONPATH.insert(0, os.path.join(self.package_folder, "Lib", "site-packages"))
         self.env_info.PYTHONHOME = self.package_folder
