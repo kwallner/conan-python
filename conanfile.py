@@ -18,7 +18,7 @@ class PythonHelper(object):
             raise errors.ConanInvalidConfiguration("Failed to find python executable.")
         return python_cmd
     
-    def python_run(self, args, *, append_pythonpath=[], **kwargs):
+    def python_run_legacy(self, args, *, append_pythonpath=[], **kwargs):
         pythonpath_list = append_pythonpath if type(append_pythonpath) == list else [ str(append_pythonpath) ] 
         python_environ = os.environ
         python_environ["PYTHONPATH"] = os.pathsep.join([ str(p) for p in pythonpath_list ]) 
@@ -27,7 +27,13 @@ class PythonHelper(object):
         command = [self._python_command]
         command.extend(args)
         return subprocess.run(command, **kwargs, env=python_environ)
-   
+    
+    def python_run(self, *args, **kwargs):
+        command = [self._python_command]
+        command.extend(args)
+        kwargs['check'] = kwargs.get('check', True)
+        subprocess.run(command, **kwargs)
+
     @property
     def _python_version(self):
         python_version_output = None
@@ -84,7 +90,7 @@ class PythonHelper(object):
             "--find-links=.", 
             "--isolated", 
             pkg_name ])
-        self.python_run(args, cwd=self.source_folder, check=True)
+        self.python_run(*args, cwd=self.source_folder, check=True)
         
     def pip_add_whl(self, pkg_name):
         self._pypi_pip_to_archive(pkg_name)
@@ -103,7 +109,7 @@ class PythonHelper(object):
                     "--isolated", 
                     pkg_name])
                 self.output.info("-- running python (cwd=%s) with args: %s" % (".", " ".join(args))) 
-                self.python_run(args, check=True)
+                self.python_run(*args, check=True)
                 for filename in os.listdir("."):
                     if filename.endswith(".tar.gz"):
                         tools.untargz(filename)
@@ -113,7 +119,7 @@ class PythonHelper(object):
                             args.extend(setup_args)
                             args.extend(["bdist_wheel", "-d", self.source_folder])
                             self.output.info("-- running python (cwd=%s) with args: %s" % (".", " ".join(args))) 
-                            self.python_run(args, check=True)
+                            self.python_run(*args, check=True)
                         self._append_install_package(pkg_name)
                     else:
                         pass
@@ -135,7 +141,7 @@ class PythonHelper(object):
             "--find-links=%s" % self.source_folder, 
             "--target", self.package_folder.replace("\\", "/"),
             "-r", "requirements.txt"]
-        self.python_run(args, check=True)
+        self.python_run(*args, check=True)
         shutil.rmtree(os.path.join(self.package_folder, "bin"))
 
     @property
