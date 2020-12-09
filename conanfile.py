@@ -21,7 +21,9 @@ class PythonHelper(object):
     def python_run(self, args, *, append_pythonpath=[], **kwargs):
         pythonpath_list = append_pythonpath if type(append_pythonpath) == list else [ str(append_pythonpath) ] 
         python_environ = os.environ
-        python_environ["PYTHONPATH"] = os.pathsep.join([ str(p) for p in pythonpath_list ]) + os.pathsep + os.environ["PYTHONPATH"]
+        python_environ["PYTHONPATH"] = os.pathsep.join([ str(p) for p in pythonpath_list ]) 
+        if "PYTHONPATH" in os.environ: 
+            python_environ["PYTHONPATH"] = python_environ["PYTHONPATH"] + os.pathsep + os.environ["PYTHONPATH"]
         command = [self._python_command]
         command.extend(args)
         return subprocess.run(command, **kwargs, env=python_environ)
