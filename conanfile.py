@@ -180,15 +180,15 @@ class PythonHelper(object):
                        
 class ConanProject(ConanFile):
     name        = "python"
-    version     = "3.7.8"
+    version     = "3.7.9"
     url         = ""
     license     = "Python Software Foundation License Version 2"
     description = "Python Programming Language Version 3"
     settings = "os", "arch"
     generators  = "txt"
-    _pip_whl = "pip-20.1.1-py2.py3-none-any.whl"
-    _wheel_whl = "wheel-0.34.2-py2.py3-none-any.whl"
-    _setuptools_whl = "setuptools-47.3.1-py3-none-any.whl"
+    _pip_whl = "pip-20.3.1-py2.py3-none-any.whl"
+    _wheel_whl = "wheel-0.36.1-py2.py3-none-any.whl"
+    _setuptools_whl = "setuptools-51.0.0-py3-none-any.whl"
 
     @property
     def python_interpreter(self):
@@ -201,9 +201,9 @@ class ConanProject(ConanFile):
         self.build_requires("cpython/%s@%s/%s" % (self.version, self.user, self.channel))
 
     def source(self):
-        tools.download("https://files.pythonhosted.org/packages/43/84/23ed6a1796480a6f1a2d38f2802901d078266bda38388954d01d3f2e821d/%s" % self._pip_whl, self._pip_whl, sha256="b27c4dedae8c41aa59108f2fa38bf78e0890e590545bc8ece7cdceb4ba60f6e4")
-        tools.download("https://files.pythonhosted.org/packages/8c/23/848298cccf8e40f5bbb59009b32848a4c38f4e7f3364297ab3c3e2e2cd14/%s" % self._wheel_whl, self._wheel_whl, sha256="df277cb51e61359aba502208d680f90c0493adec6f0e848af94948778aed386e")
-        tools.download("https://files.pythonhosted.org/packages/e9/93/4860cebd5ad3ff2664ad3c966490ccb46e3b88458b2095145bca11727ca4/%s" % self._setuptools_whl, self._setuptools_whl, sha256="4ba6f9789ea243a6b8ba57da81f75a53494456117810436fd9277a74d1c915d1")
+        tools.download("https://files.pythonhosted.org/packages/ab/11/2dc62c5263d9eb322f2f028f7b56cd9d096bb8988fcf82d65fa2e4057afe/%s" % self._pip_whl, self._pip_whl, sha256="425e79b20939abbffa7633a91151a882aedc77564d9313e3584eb0416c28c558")
+        tools.download("https://files.pythonhosted.org/packages/c9/0b/e0fd299d93cd9331657f415085a4956422959897b333e3791dde40bd711d/%s" % self._wheel_whl, self._wheel_whl, sha256="906864fb722c0ab5f2f9c35b2c65e3af3c009402c108a709c0aca27bc2c9187b")
+        tools.download("https://files.pythonhosted.org/packages/3d/f2/1489d3b6c72d68bf79cd0fba6b6c7497df4ebf7d40970e2d7eceb8d0ea9c/%s" % self._setuptools_whl, self._setuptools_whl, sha256="8c177936215945c9a37ef809ada0fab365191952f7a123618432bbfac353c529")
         
     def _install_pip(self, whl_file):
         with tools.chdir(self.package_folder):
